@@ -20,4 +20,12 @@ app.use(express.static("public"))
 // Set and get secure cookies which are set by the server
 app.use(cookieParser())
 
+
+// Import routes
+import userRoutes from './routes/user.routes.js';
+
+// Use routes
+app.use('/api/v1/users', userRoutes);
+
+
 export {app};
