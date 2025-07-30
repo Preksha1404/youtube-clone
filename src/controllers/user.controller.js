@@ -221,7 +221,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
         }
 
         // Generate new access and refresh tokens
-        const { accessToken, newRefreshToken } = await generateAccessAndRefereshTokens(user._id)
+        const { accessToken, newRefreshToken } = await generateAccessAndRefreshTokens(user._id)
 
         // Update the user's access token and refresh token in cookies
         return res
@@ -442,7 +442,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
     // 4. Add fields to get the owner details
     // 5. Return the watch history with owner details
 
-    const user = User.aggregate([
+    const user = await User.aggregate([
         {
             $match: {
                 _id: new mongoose.Types.ObjectId(req.user._id)
@@ -465,8 +465,8 @@ const getWatchHistory = asyncHandler(async (req, res) => {
                                 {
                                     $project: {
                                         fullName: 1,
-                                        avatar: 1,
-                                        username: 1
+                                        username: 1,
+                                        avatar: 1
                                     }
                                 }
                             ]
@@ -474,13 +474,16 @@ const getWatchHistory = asyncHandler(async (req, res) => {
                     },
                     {
                         $addFields: {
-                            owner: { $arrayElemAt: ["$owner", 0] }
+                            owner: {
+                                $first: "$owner"
+                            }
                         }
                     }
                 ]
             }
-        },
+        }
     ])
+
 
     if (!user?.length) {
         throw new ApiError(404, "User not found")
