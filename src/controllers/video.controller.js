@@ -9,7 +9,7 @@ import { uploadOnCloudinary } from "../utils/cloudinary.js"
 
 const getAllVideos = asyncHandler(async (req, res) => {
     const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query
-    //TODO: get all videos based on query, sort, pagination
+    // TODO: get all videos based on query, sort, pagination
 })
 
 const publishAVideo = asyncHandler(async (req, res) => {
@@ -21,6 +21,8 @@ const publishAVideo = asyncHandler(async (req, res) => {
     // Upload the video and thumbnail to cloudinary
     // Create an object and create entry in db
     // Return response
+
+    const userId = req.user?._id
 
     const { title, description } = req.body
 
@@ -43,14 +45,13 @@ const publishAVideo = asyncHandler(async (req, res) => {
         throw new ApiError(401, "Upload failed to cloudinary")
     }
 
-    console.log(videoFile)
-
     const video = await Video.create({
         title,
         description,
         videoFile: videoFile.url,
         thumbnail: thumbnail.url,
         duration: videoFile.duration,
+        owner: userId,
         isPublished: true,
     })
 
@@ -75,6 +76,7 @@ const getVideoById = asyncHandler(async (req, res) => {
     if (!videoId) {
         throw new ApiError(401, "VideoId not found")
     }
+
     const video = await Video.findById(videoId)
 
     if (!video) {
@@ -83,7 +85,7 @@ const getVideoById = asyncHandler(async (req, res) => {
 
     return res.status(200)
         .json(
-            new ApiResponse(200, Video, "Video found succesfully")
+            new ApiResponse(200, video, "Video found succesfully")
         )
 })
 
@@ -100,15 +102,21 @@ const updateVideo = asyncHandler(async (req, res) => {
     const { title, description } = req.body
     const thumbnailLocalPath = req.file?.path
 
-    // console.log(req.file)
     if (!(title || description)) {
         throw new ApiError(401, "Title or description required")
     }
 
     const thumbnail = await uploadOnCloudinary(thumbnailLocalPath)
 
-    // console.log(thumbnail)
-    const video = await Video.findByIdAndUpdate(
+    const video = await Video.findById(videoId)
+
+    const userId = req.user?._id
+
+    if (!video.owner.equals(userId)) {
+        throw ApiError(401, "You are unauthorize to update video")
+    }
+
+    const updatedVideo = await Video.findByIdAndUpdate(
         videoId,
         {
             $set: {
@@ -123,15 +131,23 @@ const updateVideo = asyncHandler(async (req, res) => {
     )
     // console.log(video)
     return res.status(200)
-        .json(new ApiResponse(200, video, "Video details updated succesfully"))
+        .json(new ApiResponse(200, updatedVideo, "Video details updated succesfully"))
 
 })
 
 const deleteVideo = asyncHandler(async (req, res) => {
     //TODO: delete video
+
     const { videoId } = req.params
 
-    const video = await Video.findByIdAndDelete(
+    const video = await Video.findById(videoId)
+    const userId = req.user?._id
+
+    if (!video.owner.equals(userId)) {
+        throw ApiError(401, "You are unauthorize to delete video")
+    }
+
+    await Video.findByIdAndDelete(
         videoId
     )
 
@@ -140,7 +156,32 @@ const deleteVideo = asyncHandler(async (req, res) => {
 })
 
 const togglePublishStatus = asyncHandler(async (req, res) => {
+
     const { videoId } = req.params
+
+    const video = await Video.findById(videoId)
+
+    const userId = req.user?._id
+
+    if (!video.owner.equals(userId)) {
+        throw ApiError(401, "You are unauthorize to update video publish status")
+    }
+
+    const updatedVideo = await Video.findByIdAndUpdate(
+        videoId,
+        {
+            $set: {
+                isPublished: !video.isPublished
+            }
+        },
+        {
+            new: true
+        }
+    )
+
+    return res.status(200)
+        .json(
+            new ApiResponse(200, updatedVideo, "Publish status is toggled!"))
 })
 
 export {
